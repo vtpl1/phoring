@@ -11,6 +11,7 @@ import (
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
+	"github.com/vtpl1/phoring/backend/rtsp"
 )
 
 type Metrics struct {
@@ -124,7 +125,7 @@ func historyHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(metricsHistory)
 }
 
-func main() {
+func main1() {
 	// Initialize the SQLite database
 	initDB()
 
@@ -134,4 +135,9 @@ func main() {
 
 	log.Println("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func main() {
+	conn := rtsp.NewClient("rtsp://172.16.2.101")
+	conn.Dial()
 }
