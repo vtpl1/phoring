@@ -11,7 +11,6 @@ import (
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
-	"github.com/vtpl1/phoring/backend/rtsp"
 )
 
 type Metrics struct {
@@ -138,6 +137,5 @@ func main1() {
 }
 
 func main() {
-	conn := rtsp.NewClient("rtsp://172.16.2.101")
-	conn.Dial()
+
 }
