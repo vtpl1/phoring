@@ -1,18 +1,36 @@
 package rtsp
 
-// https://github.com/beatgammit/rtsp
 import (
 	"bufio"
-	"fmt"
+	"crypto/tls"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
+)
+
+type Client struct {
+	URL *url.URL
+
+	sequence int
+	auth     *Auth
+	conn     net.Conn
+	session  string
+	uri      string
+	timeout  time.Duration
+}
+
+var (
+	errNotImplemented = errors.New("not implemented")
 )
 
 const (
+	// Protocol RTSP version 1.0
+	ProtoRTSP = "RTSP/1.0"
 	// Client to server for presentation and stream objects; recommended
 	DESCRIBE = "DESCRIBE"
 	// Bidirectional for client and stream objects; optional
@@ -130,8 +148,107 @@ const (
 	OptionNotsupport = 551
 )
 
-type ResponseWriter interface {
-	http.ResponseWriter
+func NewClient(uri string) *Client {
+	return &Client{
+		uri:     uri,
+		timeout: time.Second * 30,
+	}
+}
+
+func (c *Client) Dial() (err error) {
+	c.conn = nil
+	if c.URL, err = url.Parse(c.uri); err != nil {
+		return err
+	}
+	var address string
+	var hostname string // without port
+	if i := strings.IndexByte(c.URL.Host, ':'); i > 0 {
+		address = c.URL.Host
+		hostname = c.URL.Host[:i]
+	} else {
+		switch c.URL.Scheme {
+		case "rtsp", "rtsps", "rtspx":
+			address = c.URL.Host + ":554"
+		case "rtmp":
+			address = c.URL.Host + ":1935"
+		case "rtmps", "rtmpx":
+			address = c.URL.Host + ":443"
+		}
+		hostname = c.URL.Host
+	}
+	var secure *tls.Config
+
+	switch c.URL.Scheme {
+	case "rtsp", "rtmp":
+	case "rtsps", "rtspx", "rtmps", "rtmpx":
+		if c.URL.Scheme[4] == 'x' || IsIP(hostname) {
+			secure = &tls.Config{InsecureSkipVerify: true}
+		} else {
+			secure = &tls.Config{ServerName: hostname}
+		}
+	default:
+		return errors.New("unsupported scheme: " + c.URL.Scheme)
+	}
+	conn, err := net.DialTimeout("tcp", address, c.timeout)
+	if err != nil {
+		return err
+	}
+
+	if secure == nil {
+		c.conn = conn
+		return err
+	}
+	tlsConn := tls.Client(conn, secure)
+	if err = tlsConn.Handshake(); err != nil {
+		return err
+	}
+
+	if c.URL.Scheme[4] == 'x' {
+		c.URL.Scheme = c.URL.Scheme[:4] + "s"
+	}
+	c.conn = tlsConn
+
+	// remove UserInfo from URL
+	c.auth = NewAuth(c.URL.User)
+	c.URL.User = nil
+	c.conn = conn
+	c.reader = bufio.NewReaderSize(conn, c.BufferSize)
+	c.session = ""
+	c.sequence = 0
+	c.state = StateConn
+	return nil
+}
+
+func IsIP(hostname string) bool {
+	return net.ParseIP(hostname) != nil
+}
+
+func (c *Client) Options() (err error) {
+	return errNotImplemented
+}
+
+func (c *Client) Describe() (err error) {
+	return errNotImplemented
+}
+
+func (c *Client) Announce() (err error) {
+	return errNotImplemented
+}
+
+func (c *Client) Record() (err error) {
+	return errNotImplemented
+}
+
+func (c *Client) SetupMedia() (err error) {
+	return errNotImplemented
+}
+
+func (c *Client) Play() (err error) {
+	return errNotImplemented
+}
+
+func (c *Client) Teardown() (err error) {
+	return errNotImplemented
 }
 
 type Request struct {
@@ -145,220 +262,8 @@ type Request struct {
 	Body          io.ReadCloser
 }
 
-func (r Request) String() string {
-	s := fmt.Sprintf("%s %s %s/%d.%d\r\n", r.Method, r.URL, r.Proto, r.ProtoMajor, r.ProtoMinor)
-	for k, v := range r.Header {
-		for _, v := range v {
-			s += fmt.Sprintf("%s: %s\r\n", k, v)
-		}
-	}
-	s += "\r\n"
-	if r.Body != nil {
-		str, _ := io.ReadAll(r.Body)
-		s += string(str)
-	}
-	return s
-}
-
-func NewRequest(method, urlStr, cSeq string, body io.ReadCloser) (*Request, error) {
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return nil, err
-	}
-
-	req := &Request{
-		Method:     method,
-		URL:        u,
-		Proto:      "RTSP",
-		ProtoMajor: 1,
-		ProtoMinor: 0,
-		Header:     map[string][]string{"CSeq": []string{cSeq}},
-		Body:       body,
-	}
-	return req, nil
-}
-
-type Client struct {
-	cSeq    int
-	conn    net.Conn
-	session string
-}
-
-func NewClient() *Client {
-	return &Client{}
-}
-
-func (c *Client) nextCSeq() string {
-	c.cSeq++
-	return strconv.Itoa(c.cSeq)
-}
-
-func (c *Client) Describe(urlStr string) (*Response, error) {
-	req, err := NewRequest(DESCRIBE, urlStr, c.nextCSeq(), nil)
-	if err != nil {
-		panic(err)
-	}
-
-	req.Header.Add("Accept", "application/sdp")
-
-	if c.conn == nil {
-		c.conn, err = net.Dial("tcp", req.URL.Host)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	_, err = io.WriteString(c.conn, req.String())
-	if err != nil {
-		return nil, err
-	}
-	return ReadResponse(c.conn)
-}
-
-func (c *Client) Options(urlStr string) (*Response, error) {
-	req, err := NewRequest(OPTIONS, urlStr, c.nextCSeq(), nil)
-	if err != nil {
-		panic(err)
-	}
-
-	if c.conn == nil {
-		c.conn, err = net.Dial("tcp", req.URL.Host)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	_, err = io.WriteString(c.conn, req.String())
-	if err != nil {
-		return nil, err
-	}
-	return ReadResponse(c.conn)
-}
-
-func (c *Client) Setup(urlStr, transport string) (*Response, error) {
-	req, err := NewRequest(SETUP, urlStr, c.nextCSeq(), nil)
-	if err != nil {
-		panic(err)
-	}
-
-	req.Header.Add("Transport", transport)
-
-	if c.conn == nil {
-		c.conn, err = net.Dial("tcp", req.URL.Host)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	_, err = io.WriteString(c.conn, req.String())
-	if err != nil {
-		return nil, err
-	}
-	resp, err := ReadResponse(c.conn)
-	c.session = resp.Header.Get("Session")
-	return resp, err
-}
-
-func (c *Client) Play(urlStr, sessionId string) (*Response, error) {
-	req, err := NewRequest(PLAY, urlStr, c.nextCSeq(), nil)
-	if err != nil {
-		panic(err)
-	}
-
-	req.Header.Add("Session", sessionId)
-
-	if c.conn == nil {
-		c.conn, err = net.Dial("tcp", req.URL.Host)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	_, err = io.WriteString(c.conn, req.String())
-	if err != nil {
-		return nil, err
-	}
-	return ReadResponse(c.conn)
-}
-
-type closer struct {
-	*bufio.Reader
-	r io.Reader
-}
-
-func (c closer) Close() error {
-	if c.Reader == nil {
-		return nil
-	}
-	defer func() {
-		c.Reader = nil
-		c.r = nil
-	}()
-	if r, ok := c.r.(io.ReadCloser); ok {
-		return r.Close()
-	}
-	return nil
-}
-
-func ParseRTSPVersion(s string) (proto string, major int, minor int, err error) {
-	parts := strings.SplitN(s, "/", 2)
-	proto = parts[0]
-	parts = strings.SplitN(parts[1], ".", 2)
-	if major, err = strconv.Atoi(parts[0]); err != nil {
-		return
-	}
-	if minor, err = strconv.Atoi(parts[0]); err != nil {
-		return
-	}
-	return
-}
-
-// super simple RTSP parser; would be nice if net/http would allow more general parsing
-func ReadRequest(r io.Reader) (req *Request, err error) {
-	req = new(Request)
-	req.Header = make(map[string][]string)
-
-	b := bufio.NewReader(r)
-	var s string
-
-	// TODO: allow CR, LF, or CRLF
-	if s, err = b.ReadString('\n'); err != nil {
-		return
-	}
-
-	parts := strings.SplitN(s, " ", 3)
-	req.Method = parts[0]
-	if req.URL, err = url.Parse(parts[1]); err != nil {
-		return
-	}
-
-	req.Proto, req.ProtoMajor, req.ProtoMinor, err = ParseRTSPVersion(parts[2])
-	if err != nil {
-		return
-	}
-
-	// read headers
-	for {
-		if s, err = b.ReadString('\n'); err != nil {
-			return
-		} else if s = strings.TrimRight(s, "\r\n"); s == "" {
-			break
-		}
-
-		parts := strings.SplitN(s, ":", 2)
-		req.Header.Add(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
-	}
-
-	req.ContentLength, _ = strconv.Atoi(req.Header.Get("Content-Length"))
-	fmt.Println("Content Length:", req.ContentLength)
-	req.Body = closer{b, r}
-	return
-}
-
 type Response struct {
-	Proto      string
-	ProtoMajor int
-	ProtoMinor int
+	Proto string
 
 	StatusCode int
 	Status     string
@@ -367,56 +272,56 @@ type Response struct {
 
 	Header http.Header
 	Body   io.ReadCloser
+	// Body   []byte
 }
 
-func (res Response) String() string {
-	s := fmt.Sprintf("%s/%d.%d %d %s\n", res.Proto, res.ProtoMajor, res.ProtoMinor, res.StatusCode, res.Status)
-	for k, v := range res.Header {
-		for _, v := range v {
-			s += fmt.Sprintf("%s: %s\n", k, v)
-		}
+func (c *Client) WriteRequest(req *Request) (err error) {
+	if req.Proto == "" {
+		req.Proto = ProtoRTSP
 	}
-	return s
-}
+	if req.Header == nil {
+		req.Header = make(map[string][]string)
+	}
+	c.sequence++
+	// important to send case sensitive CSeq
+	// https://github.com/AlexxIT/go2rtc/issues/7
+	req.Header["CSeq"] = []string{strconv.Itoa(c.sequence)}
 
-func ReadResponse(r io.Reader) (res *Response, err error) {
-	res = new(Response)
-	res.Header = make(map[string][]string)
+	c.auth.Write(req)
 
-	b := bufio.NewReader(r)
-	var s string
-
-	// TODO: allow CR, LF, or CRLF
-	if s, err = b.ReadString('\n'); err != nil {
-		return
+	if c.session != "" {
+		req.Header.Set("Session", c.session)
 	}
 
-	parts := strings.SplitN(s, " ", 3)
-	res.Proto, res.ProtoMajor, res.ProtoMinor, err = ParseRTSPVersion(parts[0])
-	if err != nil {
-		return
+	if req.Body != nil {
+		str, _ := io.ReadAll(req.Body)
+		val := strconv.Itoa(len(str))
+		req.Header.Set("Content-Length", val)
 	}
-
-	if res.StatusCode, err = strconv.Atoi(parts[1]); err != nil {
-		return
+	if err := c.conn.SetWriteDeadline(time.Now().Add(Timeout)); err != nil {
+		return err
 	}
-
-	res.Status = strings.TrimSpace(parts[2])
-
-	// read headers
-	for {
-		if s, err = b.ReadString('\n'); err != nil {
-			return
-		} else if s = strings.TrimRight(s, "\r\n"); s == "" {
-			break
-		}
-
-		parts := strings.SplitN(s, ":", 2)
-		res.Header.Add(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
-	}
-
-	res.ContentLength, _ = strconv.ParseInt(res.Header.Get("Content-Length"), 10, 64)
-
-	res.Body = closer{b, r}
+	_, err = c.conn.Write([]byte(req.String()))
 	return
+}
+
+func (c *Client) ReadRequest() (*Request, error) {
+	return nil, errNotImplemented
+}
+
+func (c *Client) WriteResponse(res *Response) (err error) {
+	return errNotImplemented
+}
+
+func (c *Client) ReadResponse() (*Response, error) {
+	return nil, errNotImplemented
+}
+
+// Do send WriteRequest and receive and process WriteResponse
+func (c *Client) Do(req *Request) (*Response, error) {
+	return nil, errNotImplemented
+}
+
+func (c *Client) Handle() (err error) {
+	return errNotImplemented
 }
