@@ -3,14 +3,19 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	_ "github.com/glebarez/go-sqlite"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
+	"github.com/vtpl1/phoring/backend/rtsp"
 )
 
 type Metrics struct {
@@ -137,5 +142,23 @@ func main1() {
 }
 
 func main() {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+	defer signal.Stop(sigChan)
+
+	c := rtsp.NewClient("rtsp://root:AdmiN1234@172.16.0.92/axis-media/media.amp")
+	err := c.Reconnect()
+	if err != nil {
+		fmt.Printf("Error %v", err)
+		return
+	}
+	err = c.Play()
+	if err != nil {
+		fmt.Printf("Error %v", err)
+		return
+	}
+
+	go c.Handle()
+	<-sigChan
 
 }

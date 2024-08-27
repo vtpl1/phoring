@@ -85,6 +85,33 @@ func (a *Auth) Write(req *Request) {
 	}
 }
 
+func (a *Auth) Validate(req *Request) bool {
+	if a == nil {
+		return true
+	}
+
+	header := req.Header.Get("Authorization")
+	if header == "" {
+		return false
+	}
+
+	if a.Method == AuthUnknown {
+		a.Method = AuthBasic
+		a.header = "Basic " + B64(a.user, a.pass)
+	}
+
+	return header == a.header
+}
+
+func (a *Auth) ReadNone(res *Response) bool {
+	auth := res.Header.Get("WWW-Authenticate")
+	if strings.Contains(auth, "TP-LINK Streaming Media") {
+		a.Method = AuthTPLink
+		return true
+	}
+	return false
+}
+
 func Between(s, sub1, sub2 string) string {
 	i := strings.Index(s, sub1)
 	if i < 0 {
