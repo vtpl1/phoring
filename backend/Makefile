@@ -19,7 +19,7 @@ lintverify:
 
 # Run the application
 lint1:
-	@/home/vscode/go/bin/golangci-lint run ...
+	@/home/vscode/go/bin/golangci-lint run ./...
 
 # Run the application
 vul:

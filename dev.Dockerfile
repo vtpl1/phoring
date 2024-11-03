@@ -73,7 +73,7 @@ RUN wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh ${LLVM_VE
 
 ENV PATH="${PATH}:/usr/lib/llvm-${LLVM_VERSION}/bin"
 
-ARG GO_VERSION=1.23.0
+ARG GO_VERSION=1.23.2
 
 RUN mkdir gotmp && \
     wget -O go.linux-amd64.tar.gz https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz && \

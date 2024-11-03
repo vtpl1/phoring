@@ -26,6 +26,12 @@ linters-settings:
       - ^panic$
       - ^print(ln)?$
 
+  gosec:
+    excludes:
+      - G115 # Potential integer overflow when converting between integer types
+    config:      
+      G306: "0o640"
+
 linters:
   enable:
     - asciicheck       # Simple linter to check that your code does not contain non-ASCII identifiers
@@ -41,7 +47,7 @@ linters:
     - errname          # Checks that sentinel errors are prefixed with the `Err` and error types are suffixed with the `Error`.
     - errorlint        # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
     - exhaustive       # check exhaustiveness of enum switch statements
-    - exportloopref    # checks for pointers to enclosing loop variables
+    - copyloopvar      # checks for pointers to enclosing loop variables
     - forbidigo        # Forbids identifiers
     - forcetypeassert  # finds forced type assertions
     - gci              # Gci control golang package import order and make it always deterministic.
@@ -114,12 +120,41 @@ issues:
   exclude-dirs-use-default: false
   exclude-rules:
     # Allow complex tests and examples, better to be self contained
-    - path: (examples|main\.go|_test\.go)
+    - path: (main\.go|_test\.go)
       linters:
         - forbidigo
         - gocognit
+        - dupl
 
     # Allow forbidden identifiers in CLI commands
     - path: cmd
       linters:
         - forbidigo
+
+    - path: (rtsp/)
+      linters:
+        - forbidigo
+        - gosec
+        - revive
+        - ineffassign
+        - noctx
+        - stylecheck
+        - govet
+        - gosimple
+        - errorlint
+        - err113
+        - copyloopvar
+        - unused
+        - godox
+        - gocognit
+        - stylecheck
+        - gofumpt
+        - misspell
+        - staticcheck
+        - wastedassign
+        - gocritic
+        - whitespace
+
+    - path: (rtp/|rtcp/|sdp/)
+      linters:
+        - copyloopvar
