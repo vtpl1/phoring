@@ -112,3 +112,4 @@ RUN wget -q -O - https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
 RUN python -m pip install -U pip
 RUN python -m pip install poetry
 # RUN python -m poetry self add poetry-bumpversion
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest

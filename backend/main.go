@@ -129,7 +129,7 @@ func historyHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(metricsHistory)
 }
 
-func main1() {
+func main() {
 	// Initialize the SQLite database
 	initDB()
 
@@ -141,7 +141,7 @@ func main1() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func main() {
+func main2() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer signal.Stop(sigChan)
