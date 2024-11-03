@@ -84,7 +84,7 @@ ENV PATH="${PATH}:/usr/local/go/bin"
 
 # RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-ENV SHELL /bin/bash
+ENV SHELL=/bin/bash
 ENV LANG=en_US.utf-8
 ENV LC_ALL=en_US.utf-8
 
@@ -109,7 +109,21 @@ RUN wget -q -O - https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
     && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" \
     && nvm install ${NODE_VERSION}
 
+ENV PB_REL="https://github.com/protocolbuffers/protobuf/releases"
+ENV PROTOC_VERSION=28.3
+RUN mkdir -p "/home/$USERNAME/tmp" \
+    && wget -O "/home/$USERNAME/tmp/protoc-linux-x86_64.zip" "$PB_REL/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip" \
+    && unzip "/home/$USERNAME/tmp/protoc-linux-x86_64.zip" -d "/home/$USERNAME/.local" \
+    && rm -rf "/home/$USERNAME/tmp"
+
+ENV PATH="$PATH:/home/$USERNAME/.local/bin"
+
 RUN python -m pip install -U pip
 RUN python -m pip install poetry
 # RUN python -m poetry self add poetry-bumpversion
 RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+ENV PATH="$PATH:/home/$USERNAME/go/bin"
