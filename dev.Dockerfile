@@ -122,8 +122,19 @@ RUN python -m pip install -U pip
 RUN python -m pip install poetry
 # RUN python -m poetry self add poetry-bumpversion
 RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
+RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
+
+RUN go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
+
+RUN BIN="/home/$USERNAME/.local/bin" && \
+    VERSION="1.46.0" && \
+    curl -sSL \
+    "https://github.com/bufbuild/buf/releases/download/v${VERSION}/buf-$(uname -s)-$(uname -m)" \
+    -o "${BIN}/buf" && \
+    chmod +x "${BIN}/buf"
 
 ENV PATH="$PATH:/home/$USERNAME/go/bin"

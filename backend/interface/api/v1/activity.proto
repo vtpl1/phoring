@@ -4,36 +4,36 @@ package api.v1;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/vtpl1/phoring/backend/activity-log/api_v1";
+option go_package = "github.com/vtpl1/phoring/backend/activity-log/v1";
 
 service Activity_Log {
-    rpc Insert(Activity) returns (InsertResponse) {}
-    rpc Retrieve(RetrieveRequest) returns (Activity) {}
-    rpc List(ListRequest) returns (Activities) {}
+  rpc Insert(Activity) returns (InsertResponse) {}
+  rpc Retrieve(RetrieveRequest) returns (Activity) {}
+  rpc List(ListRequest) returns (Activities) {}
 }
 
 message RetrieveRequest {
-    int32 id = 1;
+  int32 id = 1;
 }
 
 message InsertResponse {
-    int32 id = 1;
+  int32 id = 1;
 }
 
 message ListRequest {
-    int32 offset = 1;
+  int32 offset = 1;
 }
 
 message Activity {
-    int32 id = 1;
-    google.protobuf.Timestamp time = 2;
-    string description = 3;
+  int32 id = 1;
+  google.protobuf.Timestamp time = 2;
+  string description = 3;
 }
 
 message Activities {
-    repeated Activity activities = 1;
+  repeated Activity activities = 1;
 }
 
 message ActivityQuery {
-	int32 offset = 1;
+  int32 offset = 1;
 }

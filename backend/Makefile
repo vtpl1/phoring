@@ -11,7 +11,7 @@ build:
 
 # Run the application
 run:
-	@go run .
+	@go run cmd/main.go
 
 # Run the application
 lintverify:
