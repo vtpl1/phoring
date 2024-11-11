@@ -7,7 +7,7 @@ lint: clear lint1
 # Build the application
 build:
 	@echo "Building..."
-	@go build
+	@go build cmd
 
 # Run the application
 run:
