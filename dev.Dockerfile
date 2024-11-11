@@ -4,16 +4,33 @@ RUN apt update \
     && DEBIAN_FRONTEND=noninteractive apt install -y \
     ca-certificates \
     software-properties-common \
-    build-essential \
+    make \
     wget \
     curl \
     git \
     unzip \
+    python3-pip \
     lsb-release && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG GO_VERSION=1.23.2
+RUN mkdir debs && \
+    dpkg --purge --force-remove-reinstreq mongodb-database-tools && \
+    wget -q https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.9.4.deb -P ./debs && \
+    apt-get install -y -q --no-install-recommends ./debs/*.deb && \
+    rm -rf debs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -sSL "https://repo.mysql.com/apt/ubuntu/pool/mysql-apt-config/m/mysql-apt-config/mysql-apt-config_0.8.29-1_all.deb" -o "mysql-apt-config.deb" && \
+    export DEBIAN_FRONTEND=noninteractive && \
+    dpkg -i "mysql-apt-config.deb" && \
+    apt-get update && \
+    apt-get install -y mysql-shell && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+ARG GO_VERSION=1.23.3
 
 RUN mkdir gotmp && \
     wget -O go.linux-amd64.tar.gz https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz && \
@@ -76,3 +93,5 @@ RUN BIN="/home/$USERNAME/.local/bin" && \
     chmod +x "${BIN}/buf"
 
 ENV PATH="$PATH:/home/$USERNAME/go/bin"
+
+RUN pip install -U pip poetry bump2version

@@ -7,7 +7,8 @@ lint: clear lint1
 # Build the application
 build:
 	@echo "Building..."
-	@go build cmd
+	@go clean
+	@go build -buildvcs=true -ldflags "-s -w"
 
 # Run the application
 run:
