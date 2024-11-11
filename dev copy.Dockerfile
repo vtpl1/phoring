@@ -8,10 +8,70 @@ RUN apt update \
     wget \
     curl \
     git \
-    unzip \
     lsb-release && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+RUN sed -i 's/# deb-src/deb-src/' /etc/apt/sources.list \
+    && apt update \
+    && DEBIAN_FRONTEND=noninteractive apt-get -y build-dep python3 \
+    && DEBIAN_FRONTEND=noninteractive apt install -y build-essential \
+    gdb \
+    lcov \
+    pkg-config \
+    libbz2-dev \
+    libffi-dev \
+    libgdbm-dev \
+    libgdbm-compat-dev \
+    liblzma-dev \
+    libncurses5-dev \
+    libreadline6-dev \
+    libsqlite3-dev \
+    libssl-dev \
+    lzma \
+    ninja-build \
+    ccache \    
+    zip unzip \
+    autoconf autoconf-archive \
+    lzma-dev \
+    tk-dev \
+    uuid-dev \
+    zlib1g-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && wget -O Python-3.12.3.tar.xz https://www.python.org/ftp/python/3.12.3/Python-3.12.3.tar.xz \
+    && tar xvf Python-3.12.3.tar.xz  \
+    && cd Python-3.12.3 \
+    && sh configure --enable-optimizations --enable-shared \
+    && make install \
+    && update-alternatives --install /usr/bin/python python /usr/local/bin/python3.12 0 \
+    && cd .. \
+    && rm -rf Python-3.12.3 \
+    && rm Python-3.12.3.tar.xz
+
+RUN mkdir debs && \
+    dpkg --purge --force-remove-reinstreq mongodb-database-tools && \
+    wget -q https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.9.4.deb -P ./debs && \
+    apt-get install -y -q --no-install-recommends ./debs/*.deb && \
+    rm -rf debs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -sSL "https://repo.mysql.com/apt/ubuntu/pool/mysql-apt-config/m/mysql-apt-config/mysql-apt-config_0.8.29-1_all.deb" -o "mysql-apt-config.deb" && \
+    export DEBIAN_FRONTEND=noninteractive && \
+    dpkg -i "mysql-apt-config.deb" && \
+    apt-get update && \
+    apt-get install -y mysql-shell && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN wget -O cmake.sh https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-linux-x86_64.sh \
+    && sh cmake.sh --prefix=/usr/local/ --exclude-subdir && rm -rf cmake.sh
+
+ARG LLVM_VERSION=18
+RUN wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh ${LLVM_VERSION} all
+
+ENV PATH="${PATH}:/usr/lib/llvm-${LLVM_VERSION}/bin"
 
 ARG GO_VERSION=1.23.2
 
@@ -58,6 +118,8 @@ RUN mkdir -p "/home/$USERNAME/tmp" \
 
 ENV PATH="$PATH:/home/$USERNAME/.local/bin"
 
+RUN python -m pip install -U pip
+RUN python -m pip install poetry
 # RUN python -m poetry self add poetry-bumpversion
 RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
