@@ -6,10 +6,17 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
+
+// Logger wraps zerolog.Logger with an embedded lumberjack.Logger for log rotation.
+type Logger struct {
+	zerolog.Logger
+	rotator *lumberjack.Logger // Keep a reference to close when done
+}
 
 // GetAppName returns Application name
 func GetAppName() string {
@@ -17,7 +24,12 @@ func GetAppName() string {
 	if err != nil {
 		return "ojana"
 	}
-	return filepath.Base(file)
+	file = filepath.Base(file)
+	names := strings.Split(file, ".")
+	if len(names) > 1 {
+		return names[0]
+	}
+	return file
 }
 
 // GetAppRunningDir returns Application running directory
@@ -47,7 +59,7 @@ func GetLibDir() string {
 // CreateDir creates directory if it does not exists
 func CreateDir(path string) string {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err := os.Mkdir(path, 0o640)
+		err := os.MkdirAll(path, 0o640)
 		if err != nil {
 			// nolint:forbidigo
 			panic("Can not create file")
@@ -60,25 +72,50 @@ func GetLogFileName() string {
 	return filepath.Join(GetLogDir(), fmt.Sprintf("%s.log", GetAppName()))
 }
 
-func newLogger() zerolog.Logger {
+func GetLockFileName() string {
+	return filepath.Join(os.TempDir(), fmt.Sprintf("%s.lock", GetAppName()))
+}
 
-	lumberjackLogger := &lumberjack.Logger{
+func NewLogger() *Logger {
+
+	rotator := &lumberjack.Logger{
 		Filename:   GetLogFileName(),
-		MaxSize:    1,
-		MaxBackups: 3,
+		MaxSize:    20, // Max size in MB before rotation
+		MaxBackups: 3,  // Max number of backup files
 	}
-	return zerolog.New(lumberjackLogger).With().Timestamp().Logger()
+	logger := zerolog.New(rotator).With().Timestamp().Logger()
+	// Set the logging level based on environment variable
+	if os.Getenv("LOG_LEVEL") == "DEBUG" {
+		logger = logger.Level(zerolog.DebugLevel)
+	} else {
+		logger = logger.Level(zerolog.InfoLevel)
+	}
+	return &Logger{
+		Logger:  logger,
+		rotator: rotator,
+	}
+}
+
+// Close releases resources held by the logger, especially the lumberjack rotator.
+func (l *Logger) Close() error {
+	return l.rotator.Close()
 }
 
 // GetLogger returns a logger
-func GetLogger(_ string) zerolog.Logger {
+func GetLogger(_ string) Logger {
 	if logger == nil {
-		logger1 := newLogger()
-		logger = &logger1
+		logger = NewLogger()
+
 		return *logger
 	}
 	return *logger
 }
 
+func CloseLogger() {
+	if logger != nil {
+		logger.rotator.Close()
+	}
+}
+
 // nolint:gochecknoglobals
-var logger *zerolog.Logger
+var logger *Logger
