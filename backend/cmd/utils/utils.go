@@ -23,7 +23,6 @@ func GetAppName() string {
 // GetAppRunningDir returns Application running directory
 func GetAppRunningDir() string {
 	file, err := os.Getwd()
-	fmt.Printf("GetAppRunningDir %v %v\n", file, err)
 	if err != nil {
 		return "./"
 	}
@@ -57,14 +56,17 @@ func CreateDir(path string) string {
 	return path
 }
 
+func GetLogFileName() string {
+	return filepath.Join(GetLogDir(), fmt.Sprintf("%s.log", GetAppName()))
+}
+
 func newLogger() zerolog.Logger {
-	logFileName := filepath.Join(GetLogDir(), fmt.Sprintf("%s.log", GetAppName()))
+
 	lumberjackLogger := &lumberjack.Logger{
-		Filename:   logFileName,
+		Filename:   GetLogFileName(),
 		MaxSize:    1,
 		MaxBackups: 3,
 	}
-	fmt.Printf("Creating log at %v\n", logFileName)
 	return zerolog.New(lumberjackLogger).With().Timestamp().Logger()
 }
 
@@ -72,7 +74,6 @@ func newLogger() zerolog.Logger {
 func GetLogger(_ string) zerolog.Logger {
 	if logger == nil {
 		logger1 := newLogger()
-		fmt.Println("Creating new logger")
 		logger = &logger1
 		return *logger
 	}

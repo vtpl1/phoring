@@ -14,11 +14,12 @@ import (
 )
 
 func main() {
+	fmt.Printf("Log at : %s\n", utils.GetLogFileName())
 	l := utils.GetLogger("")
-	l.Error().Msgf("App Name: %s, working Dir: %s", utils.GetAppName(), utils.GetAppRunningDir())
+	l.Error().Str("App name", utils.GetAppName()).Str("Working Dir", utils.GetAppRunningDir()).Send()
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
-	fmt.Println("Blocking, press ctrl+c to continue...")
+	fmt.Println("Blocking, press ctrl+c to stop...")
 
 	go func() {
 		for {
@@ -36,4 +37,5 @@ func main() {
 		}
 	}()
 	<-done // Will block here until user hits ctrl+c
+	fmt.Printf("\nClean shutdown : %s\n", utils.GetAppName())
 }
